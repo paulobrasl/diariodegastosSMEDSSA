@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Transparente - Gastos SMED Salvador</title>
+    
+    <!-- Tailwind CSS (Estilização) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PapaParse (Leitor de CSV) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Chart.js (Gráficos) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col min-h-screen">
+
+    <!-- Header / Navbar -->
+    <header class="bg-indigo-900 text-white border-b border-indigo-800 shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-800 rounded-lg">
+                    <i data-lucide="building-2" class="w-6 h-6 text-indigo-300"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">Transparência SMED Salvador</h1>
+                    <p class="text-xs text-indigo-200">Monitoramento diário via Diário Oficial do Município</p>
+                </div>
+            </div>
+            <div class="hidden md:flex items-center space-x-2 text-xs bg-indigo-950/50 px-3 py-1.5 rounded-full border border-indigo-700/50">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-indigo-200" id="last-update-text">Atualizado recentemente</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        <!-- Hero Section / Intro -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-900">Acompanhamento de Despesas</h2>
+                <p class="text-slate-500 text-sm mt-1">Dados extraídos automaticamente do Diário Oficial relativos à Secretaria Municipal de Educação.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="dados/gastos_smed.csv" download class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                    <i data-lucide="download" class="w-4 h-4"></i> Baixar CSV
+                </a>
+            </div>
+        </div>
+
+        <!-- Metrics Cards Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <!-- Total Gasto -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Mapeado</span>
+                    <span class="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="dollar-sign" class="w-5 h-5"></i></span>
+                </div>
+                <div class="mt-4">
+                    <div id="stat-total" class="text-2xl font-bold text-slate-900">R$ 0,00</div>
+                    <span class="text-xs text-slate-500 mt-1 block">Soma de todos os contratos e diários</span>
+                </div>
+            </div>
+
+            <!-- Total Registros -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total de Extratos</span>
+                    <span class="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="file-text" class="w-5 h-5"></i></span>
+                </div>
+                <div class="mt-4">
+                    <div id="stat-count" class="text-2xl font-bold text-slate-900">0</div>
+                    <span class="text-xs text-slate-500 mt-1 block">Publicações identificadas</span>
+                </div>
+            </div>
+
+            <!-- Maior Fornecedor -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Maior Categoria</span>
+                    <span class="p-2 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="pie-chart" class="w-5 h-5"></i></span>
+                </div>
+                <div class="mt-4">
+                    <div id="stat-top-category" class="text-lg font-bold text-slate-900 truncate">---</div>
+                    <span class="text-xs text-slate-500 mt-1 block" id="stat-top-category-val">R$ 0,00</span>
+                </div>
+            </div>
+
+            <!-- Média por Publicação -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Valor Médio</span>
+                    <span class="p-2 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="trending-up" class="w-5 h-5"></i></span>
+                </div>
+                <div class="mt-4">
+                    <div id="stat-avg" class="text-2xl font-bold text-slate-900">R$ 0,00</div>
+                    <span class="text-xs text-slate-500 mt-1 block">Média por ato publicado</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Pie/Doughnut Chart -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm lg:col-span-1">
+                <h3 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-600"></i> Gastos por Categoria
+                </h3>
+                <div class="relative h-64 flex justify-center items-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Bar Chart -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm lg:col-span-2">
+                <h3 class="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i> Maiores Recebedores / Favorecidos
+                </h3>
+                <div class="relative h-64">
+                    <canvas id="vendorChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table Section -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-base font-semibold text-slate-900">Detalhamento dos Lançamentos</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Consulte os dados brutos e faça buscas por fornecedor ou objeto.</p>
+                </div>
+                <div class="relative w-full sm:w-72">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <input type="text" id="table-search" placeholder="Buscar favorecido, objeto..." class="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 uppercase font-semibold">
+                        <tr>
+                            <th class="py-3.5 px-6">Data / Edição</th>
+                            <th class="py-3.5 px-6">Favorecido</th>
+                            <th class="py-3.5 px-6">Categoria</th>
+                            <th class="py-3.5 px-6">Objeto / Descrição</th>
+                            <th class="py-3.5 px-6 text-right">Valor (R$)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-100 text-slate-600">
+                        <!-- Linhas geradas via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400 space-y-2">
+            <p>Projeto independente de transparência pública. Dados extraídos de diários oficiais públicos.</p>
+            <p>Desenvolvido com IA & GitHub Actions</p>
+        </div>
+    </footer>
+
+    <!-- Logic JS -->
+    <script>
+        // Inicializar Lucide Icons
+        lucide.createIcons();
+
+        let rawData = [];
+        let categoryChartInstance = null;
+        let vendorChartInstance = null;
+
+        // Função para formatar Moeda (BRL)
+        const formatBRL = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+        // Carregar o arquivo CSV
+        document.addEventListener("DOMContentLoaded", () => {
+            // Ajuste o caminho se o arquivo estiver na pasta 'dados/'
+            Papa.parse("dados/gastos_smed.csv", {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    rawData = results.data.map(row => ({
+                        ...row,
+                        ValorNum: parseFloat(row.Valor) || 0
+                    }));
+                    
+                    initDashboard(rawData);
+                },
+                error: function(err) {
+                    console.error("Erro ao ler CSV:", err);
+                }
+            });
+        });
+
+        function initDashboard(data) {
+            renderMetrics(data);
+            renderCharts(data);
+            renderTable(data);
+
+            // Adicionar evento de busca
+            document.getElementById("table-search").addEventListener("input", (e) => {
+                const term = e.target.value.toLowerCase();
+                const filtered = data.filter(item => 
+                    (item.Favorecido && item.Favorecido.toLowerCase().includes(term)) ||
+                    (item.Objeto && item.Objeto.toLowerCase().includes(term)) ||
+                    (item.Categoria && item.Categoria.toLowerCase().includes(term))
+                );
+                renderTable(filtered);
+            });
+        }
+
+        // 1. Métricas Principais
+        function renderMetrics(data) {
+            const total = data.reduce((acc, curr) => acc + curr.ValorNum, 0);
+            const count = data.length;
+            const avg = count > 0 ? total / count : 0;
+
+            // Agrupar por categoria para achar a maior
+            const catTotals = {};
+            data.forEach(d => {
+                catTotals[d.Categoria] = (catTotals[d.Categoria] || 0) + d.ValorNum;
+            });
+            
+            let topCat = "N/A";
+            let topCatVal = 0;
+            Object.entries(catTotals).forEach(([cat, val]) => {
+                if (val > topCatVal) {
+                    topCatVal = val;
+                    topCat = cat;
+                }
+            });
+
+            document.getElementById("stat-total").innerText = formatBRL(total);
+            document.getElementById("stat-count").innerText = count;
+            document.getElementById("stat-avg").innerText = formatBRL(avg);
+            document.getElementById("stat-top-category").innerText = topCat;
+            document.getElementById("stat-top-category-val").innerText = formatBRL(topCatVal);
+
+            if(data.length > 0 && data[0].Data) {
+                document.getElementById("last-update-text").innerText = `Última data registrada: ${data[0].Data}`;
+            }
+        }
+
+        // 2. Gráficos
+        function renderCharts(data) {
+            // Agrupar Categoria
+            const catMap = {};
+            data.forEach(d => {
+                catMap[d.Categoria] = (catMap[d.Categoria] || 0) + d.ValorNum;
+            });
+
+            // Agrupar Favorecidos (Top 5)
+            const vendorMap = {};
+            data.forEach(d => {
+                vendorMap[d.Favorecido] = (vendorMap[d.Favorecido] || 0) + d.ValorNum;
+            });
+
+            const topVendors = Object.entries(vendorMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+
+            // Destruir instâncias antigas se existirem
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            if (vendorChartInstance) vendorChartInstance.destroy();
+
+            // Gráfico 1: Categorias (Doughnut)
+            const ctxCat = document.getElementById('categoryChart').getContext('2d');
+            categoryChartInstance = new Chart(ctxCat, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(catMap),
+                    datasets: [{
+                        data: Object.values(catMap),
+                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }
+                    }
+                }
+            });
+
+            // Gráfico 2: Fornecedores (Barra Horizontal)
+            const ctxVendor = document.getElementById('vendorChart').getContext('2d');
+            vendorChartInstance = new Chart(ctxVendor, {
+                type: 'bar',
+                data: {
+                    labels: topVendors.map(v => v[0].length > 25 ? v[0].substring(0, 25) + '...' : v[0]),
+                    datasets: [{
+                        label: 'Total Recebido (R$)',
+                        data: topVendors.map(v => v[1]),
+                        backgroundColor: '#6366f1',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 } } },
+                        y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // 3. Tabela de Dados
+        function renderTable(data) {
+            const tbody = document.getElementById("table-body");
+            tbody.innerHTML = "";
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">Nenhum registro encontrado.</td></tr>`;
+                return;
+            }
+
+            data.forEach(item => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-50/80 transition-colors";
+
+                tr.innerHTML = `
+                    <td class="py-4 px-6 font-medium text-slate-900 whitespace-nowrap">
+                        ${item.Data || '-'}
+                        <span class="block text-xs text-slate-400 font-normal">Ed. nº ${item.Edicao || '-'}</span>
+                    </td>
+                    <td class="py-4 px-6 font-medium text-slate-800">${item.Favorecido || '-'}</td>
+                    <td class="py-4 px-6">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                            ${item.Categoria || 'Geral'}
+                        </span>
+                    </td>
+                    <td class="py-4 px-6 text-xs text-slate-500 max-w-md truncate" title="${item.Objeto}">
+                        ${item.Objeto || '-'}
+                    </td>
+                    <td class="py-4 px-6 font-semibold text-slate-900 text-right whitespace-nowrap">
+                        ${formatBRL(item.ValorNum)}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
